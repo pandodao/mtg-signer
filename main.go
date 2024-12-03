@@ -26,6 +26,14 @@ func main() {
 		return
 	}
 
+	if cfg.Dapp.PinSeed != "" {
+		key, err := mixinnet.KeyFromSeed(cfg.Dapp.PinSeed)
+		if err != nil {
+			panic(err)
+		}
+		cfg.Dapp.Pin = key.String()
+	}
+
 	// init mixin client
 	client, err := mixin.NewFromKeystore(&mixin.Keystore{
 		ClientID:          cfg.Dapp.ClientID,
