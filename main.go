@@ -2,7 +2,11 @@ package main
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/base64"
+	"encoding/hex"
 	"flag"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -23,6 +27,41 @@ func main() {
 	if err != nil {
 		slog.Error("load config failed", slog.Any("err", err))
 		return
+	}
+
+	if cfg.Dapp.PrivateKeySeed != "" {
+		key, err := KeyFromSeed(cfg.Dapp.PrivateKeySeed)
+		if err != nil {
+			panic(fmt.Errorf("parse pin seed failed: %w", err))
+		}
+
+		privateKey := cfg.Dapp.PrivateKeySeed + key.Public().String()
+		bts, _ := hex.DecodeString(privateKey)
+		cfg.Dapp.PrivateKey = base64.StdEncoding.EncodeToString(bts)
+	}
+	if cfg.Dapp.ServerPublicKey != "" {
+		b, err := hex.DecodeString(cfg.Dapp.ServerPublicKey)
+		if err != nil {
+			panic(fmt.Errorf("decode server public key failed: %w", err))
+		}
+
+		if len(b) != ed25519.PublicKeySize {
+			panic(fmt.Errorf("invalid server public key"))
+		}
+
+		pub, err := publicKeyToCurve25519(b)
+		if err != nil {
+			panic(fmt.Errorf("convert server public key to curve25519 failed: %w", err))
+		}
+
+		cfg.Dapp.PinToken = base64.StdEncoding.EncodeToString(pub)
+	}
+	if cfg.Dapp.PinSeed != "" {
+		pin, err := KeyFromSeed(cfg.Dapp.PinSeed)
+		if err != nil {
+			panic(fmt.Errorf("parse pin seed failed: %w", err))
+		}
+		cfg.Dapp.Pin = pin.String()
 	}
 
 	// init mixin client
