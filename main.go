@@ -2,18 +2,15 @@ package main
 
 import (
 	"context"
-	"crypto/ed25519"
-	"encoding/base64"
-	"encoding/hex"
 	"flag"
-	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
 	"time"
 
 	"github.com/asaskevich/govalidator"
-	"github.com/fox-one/mixin-sdk-go"
+	"github.com/fox-one/mixin-sdk-go/v2"
+	"github.com/fox-one/mixin-sdk-go/v2/mixinnet"
 )
 
 var (
@@ -29,47 +26,14 @@ func main() {
 		return
 	}
 
-	if cfg.Dapp.PrivateKeySeed != "" {
-		key, err := KeyFromSeed(cfg.Dapp.PrivateKeySeed)
-		if err != nil {
-			panic(fmt.Errorf("parse pin seed failed: %w", err))
-		}
-
-		privateKey := cfg.Dapp.PrivateKeySeed + key.Public().String()
-		bts, _ := hex.DecodeString(privateKey)
-		cfg.Dapp.PrivateKey = base64.StdEncoding.EncodeToString(bts)
-	}
-	if cfg.Dapp.ServerPublicKey != "" {
-		b, err := hex.DecodeString(cfg.Dapp.ServerPublicKey)
-		if err != nil {
-			panic(fmt.Errorf("decode server public key failed: %w", err))
-		}
-
-		if len(b) != ed25519.PublicKeySize {
-			panic(fmt.Errorf("invalid server public key"))
-		}
-
-		pub, err := publicKeyToCurve25519(b)
-		if err != nil {
-			panic(fmt.Errorf("convert server public key to curve25519 failed: %w", err))
-		}
-
-		cfg.Dapp.PinToken = base64.StdEncoding.EncodeToString(pub)
-	}
-	if cfg.Dapp.PinSeed != "" {
-		pin, err := KeyFromSeed(cfg.Dapp.PinSeed)
-		if err != nil {
-			panic(fmt.Errorf("parse pin seed failed: %w", err))
-		}
-		cfg.Dapp.Pin = pin.String()
-	}
-
 	// init mixin client
 	client, err := mixin.NewFromKeystore(&mixin.Keystore{
-		ClientID:   cfg.Dapp.ClientID,
-		SessionID:  cfg.Dapp.SessionID,
-		PrivateKey: cfg.Dapp.PrivateKey,
-		PinToken:   cfg.Dapp.PinToken,
+		ClientID:          cfg.Dapp.ClientID,
+		SessionID:         cfg.Dapp.SessionID,
+		PrivateKey:        cfg.Dapp.PrivateKey,
+		PinToken:          cfg.Dapp.PinToken,
+		ServerPublicKey:   cfg.Dapp.ServerPublicKey,
+		SessionPrivateKey: cfg.Dapp.PrivateKeySeed,
 	})
 	if err != nil {
 		slog.Error("init mixin client failed", slog.Any("err", err))
@@ -152,12 +116,12 @@ func handleOutput(ctx context.Context, client *mixin.Client, output *mixin.Multi
 		return nil
 	}
 
-	hash, err := client.SendRawTransaction(ctx, sig.RawTransaction)
+	tx, err := mixinnet.NewClient(mixinnet.DefaultLegacyConfig).SendRawTransaction(ctx, sig.RawTransaction)
 	if err != nil {
 		log.Error("SendRawTransaction", slog.Any("err", err))
 		return err
 	}
 
-	log.Info("SendRawTransaction", slog.String("hash", hash.String()))
+	log.Info("SendRawTransaction", slog.String("hash", tx.Hash.String()))
 	return nil
 }
