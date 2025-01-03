@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"flag"
 	"log/slog"
 	"os"
@@ -130,6 +131,14 @@ func handleOutput(ctx context.Context, client *mixin.Client, output *mixin.Multi
 		return err
 	}
 
-	log.Info("SendRawTransaction", slog.String("hash", tx.Hash.String()))
+	log.Info("SendRawTransaction", slog.String("hash", formatHash(tx.Hash)))
 	return nil
+}
+
+func formatHash(hash *mixinnet.Hash) string {
+	if hash == nil {
+		hash = &mixinnet.Hash{}
+	}
+
+	return hex.EncodeToString(hash[:])
 }
